@@ -180,7 +180,7 @@
             const storedUser = localStorage.getItem("currentUser");
             if (storedUser) {
                 // User already signed in; redirect to the plan page so progress is preserved
-                window.location.href = "plan.html";
+                window.location.href = "index.html";
             }
         }
         // On page load, check for an existing user
@@ -212,7 +212,7 @@
                         if (userExists) {
                             // If user exists, set currentUser from the stored data
                             currentUser = users.find(user => user.username === username);
-                            submitData(); // Redirect to plan.html with progress preserved
+                            submitData(); 
                         } else {
                             // If not found, show a message and allow registration
                             showQuestion(10); // "اسم المستخدم غير موجود" question
@@ -572,7 +572,7 @@
             console.log("Current user data saved:", currentUser);
     
             // Redirect to plan.html where the user's progress is loaded
-            window.location.href = "plan.html";
+            window.location.href = "index.html";
         }
     
         // Start the sign-in flow
