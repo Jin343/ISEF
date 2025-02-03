@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BreakFree</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Add this CSS for the progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            position: fixed;
+            top:0;
+            left:0;
+            background-color: #F0F4F8; /* Light gray background */
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #5198A4;  /*Blue progress color */
+            width: 0; /* Initial width */
+            transition: width 0.3s ease; /* Smooth transition */
+        }
+        /* Rest of your original CSS */
+        * {
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+            font-family: 'Cairo', 'Arial', sans-serif;
+        }
+        body {
+            margin: 0;
+            background-color: #FAFAFA;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            direction: rtl;
+        }
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            border-radius: 15px;
+            padding: 20px;
+            animation: fadeIn 1s ease-in-out;
+        }
+        h1 {
+            text-align: center;
+            color: #5198A4;
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+        p {
+            color: black;
+            font-size: 1.5rem;
+            text-align: center;
+            padding: 30px 0 40px;
+        }
+        .question {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .question.active {
+            display: block;
+            opacity: 1;
+        }
+        .input-container input,
+        .input-container textarea {
+            width: 100%;
+            text-align: right;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 1.1rem;
+        }
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .options-container button {
+            width: 80%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            background-color: #5198A4;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .options-container button i {
+            font-size: 1.2rem;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .next-btn,
+        .before-btn {
+            background-color: #5198A4;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 20px;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 45%;
+            transition: background-color 0.3s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .next-btn:hover,
+        .before-btn:hover {
+            background-color: #5198A4;
+            transform: scale(1.05);
+        }
+        .before-btn {
+            background-color: #83daf7;
+        }
+        .error {
+            color: red;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 10px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress" id="progress"></div>
+        </div>
+        <!-- Question Container -->
+        <div id="question-container"></div>
+    </div>
+
+    <script>
+        // Load users from localStorage or use defaults
+        let users = JSON.parse(localStorage.getItem("users")) || [
+            { username: "john", name: "جون", age: 25 },
+            { username: "jane", name: "جين", age: 30 },
+            { username: "alice", name: "أليس", age: 22 }
+        ];
+    
+        // Temporary object to store current user's data
+        let currentUser = {};
+    
+        // Function to save users to localStorage
+        function saveUsers() {
+            localStorage.setItem("users", JSON.stringify(users));
+        }
+    
+        // Check if user information already exists
+        function checkUserInfo() {
+            const storedUser = localStorage.getItem("currentUser");
+            if (storedUser) {
+                // User already signed in; redirect to the plan page so progress is preserved
+                window.location.href = "plan.html";
+            }
+        }
+        // On page load, check for an existing user
+        checkUserInfo();
+    
+        // Questions for the sign-in flow
+        const questions = [
+            {
+                id: 1,
+                text: "هل لديك حساب بالفعل؟",
+                type: "options",
+                options: [
+                    { text: 'نعم', action: () => showQuestion(2) },
+                    { text: "لا", action: () => showQuestion(3) }
+                ]
+            },
+            {
+                id: 2,
+                text: "الرجاء إدخال اسم المستخدم:",
+                type: "input",
+                inputType: "text",
+                placeholder: "اسم المستخدم",
+                next: () => {
+                    const username = document.getElementById("input-2").value.trim();
+                    const errorElement = document.getElementById("error-2");
+                    if (username && /^[A-Za-z]+$/.test(username)) {
+                        // Check if username exists in users array
+                        const userExists = users.some(user => user.username === username);
+                        if (userExists) {
+                            // If user exists, set currentUser from the stored data
+                            currentUser = users.find(user => user.username === username);
+                            submitData(); // Redirect to plan.html with progress preserved
+                        } else {
+                            // If not found, show a message and allow registration
+                            showQuestion(10); // "اسم المستخدم غير موجود" question
+                        }
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال اسم مستخدم صحيح (باللغة الإنجليزية فقط).";
+                    }
+                }
+            },
+            {
+                id: 3,
+                text: "مرحبًا! أنا نوڤيل، طبيبتك النفسية الافتراضية.<br><br> سأكون هنا لمساعدتك. دعنا نبدأ أولاً بتقديم بعض المعلومات الأساسية.",
+                type: "info",
+                next: () => showQuestion(4)
+            },
+            {
+                id: 4,
+                text: "أولاً، ما اسمك؟",
+                type: "input",
+                inputType: "text",
+                placeholder: "أدخل اسمك هنا",
+                next: () => {
+                    const name = document.getElementById("input-4").value.trim();
+                    const errorElement = document.getElementById("error-4");
+                    if (name && /^[\u0600-\u06FF\s]+$/.test(name)) {
+                        currentUser.name = name;
+                        showQuestion(5);
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال اسم صحيح (باللغة العربية فقط).";
+                    }
+                }
+            },
+            {
+                id: 5,
+                text: "اختر اسم مستخدم فريد:",
+                type: "input",
+                inputType: "text",
+                placeholder: "اسم المستخدم",
+                next: () => {
+                    const username = document.getElementById("input-5").value.trim();
+                    const errorElement = document.getElementById("error-5");
+                    if (username && /^[A-Za-z]+$/.test(username)) {
+                        // Check if the username is already used
+                        const userExists = users.some(user => user.username === username);
+                        if (userExists) {
+                            // If the username exists, ask if they have an account already.
+                            showQuestion(13);
+                        } else {
+                            currentUser.username = username;
+                            showQuestion(6);
+                        }
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال اسم مستخدم صحيح (باللغة الإنجليزية فقط).";
+                    }
+                }
+            },
+            {
+                id: 6,
+                text: "كم عمرك؟",
+                type: "input",
+                inputType: "number",
+                placeholder: "أدخل عمرك",
+                next: () => {
+                    const age = document.getElementById("input-6").value.trim();
+                    const errorElement = document.getElementById("error-6");
+                    if (age) {
+                        currentUser.age = age;
+                        showQuestion(7);
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال عمرك.";
+                    }
+                }
+            },
+            {
+                id: 7,
+                text: "ما الذي يصف سبب وجودك هنا بشكل أفضل؟",
+                type: "options",
+                options: [
+                    { text: `تحسين الصحة النفسية`, action: () => showQuestion(8) },
+                    { text: `الإدمان`, action: () => showQuestion(9) }
+                ]
+            },
+            {
+                id: 8,
+                text: "ما نوع المشكلة الصحية النفسية التي تواجهها حالياً؟",
+                type: "options",
+                options: [
+                    { 
+                      text: "الاكتئاب", 
+                      action: () => { 
+                          currentUser.condition = "depression"; 
+                          submitData();
+                      } 
+                    },
+                    { 
+                      text: "القلق", 
+                      action: () => { 
+                          currentUser.condition = "anxiety"; 
+                          submitData();
+                      } 
+                    }
+                      ]
+                    },  
+                    {
+                        id: 9,
+                        text: "ما نوع الإدمان الذي تعاني منه؟",
+                        type: "options",
+                        options: [
+                            { text: "وسائل التواصل الاجتماعي", action: () => showQuestion(18) },
+                            { text: "السجائر", action: () => showQuestion(14) },
+                            { text: "القهوة", action: () => showQuestion(15) },
+                            { text: "السكر", action: () => showQuestion(16) },
+                            { text: "ألعاب الفيديو", action: () => showQuestion(19) } // Added video games option
+                        ]
+                    },
+                    {
+                        id: 19,
+                        text: "كم ساعة تقضي في لعب ألعاب الفيديو يومياً؟",
+                        type: "input",
+                        inputType: "number",
+                        placeholder: "عدد الساعات",
+                        next: () => {
+                            const hours = document.getElementById("input-19").value.trim();
+                            const errorElement = document.getElementById("error-19");
+                            if (hours) {
+                                currentUser.condition = "videoGames"; // Set the condition to videoGames
+                                currentUser.usage = hours; // Store the usage data
+                                submitData(); // Submit the data and redirect
+                                errorElement.textContent = "";
+                            } else {
+                                errorElement.textContent = "الرجاء إدخال عدد الساعات.";
+                            }
+                        }
+                    },
+            
+            {
+                id: 18,
+                text: "كم ساعة تستخدم وسائل التواصل الاجتماعي يومياً؟",
+                type: "input",
+                inputType: "number",
+                placeholder: "عدد الساعات",
+                next: () => {
+                    const hours = document.getElementById("input-18").value.trim();
+                    const errorElement = document.getElementById("error-18");
+                    if (hours) {
+                        currentUser.condition="socialMedia";
+                        currentUser.usage = hours;
+                        submitData();
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال عدد الساعات.";
+                    }
+                }
+            },
+            {
+                id: 14,
+                text: "كم تستهلك يوميا من السجائر؟",
+                type: "input",
+                inputType: "number",
+                placeholder: "عدد السجائر",
+                next: () => {
+                    const cigarettes = document.getElementById("input-14").value.trim();
+                    const errorElement = document.getElementById("error-14");
+                    if (cigarettes) {
+                        currentUser.condition="smoking";
+                        currentUser.usage = cigarettes;
+                        submitData();
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال العدد.";
+                    }
+                }
+            },
+            {
+                id: 15,
+                text: "كم تستهلك يوميا من القهوة؟",
+                type: "input",
+                inputType: "number",
+                placeholder: "عدد الكؤوس",
+                next: () => {
+                    const coffee = document.getElementById("input-15").value.trim();
+                    const errorElement = document.getElementById("error-15");
+                    if (coffee) {
+                        currentUser.condition="coffee";
+                        currentUser.usage = coffee;
+                        submitData();
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال العدد.";
+                    }
+                }
+            },
+            {
+                id: 16,
+                text: "كم كمية السكر التي تستهلكها يومياً؟",
+                type: "input",
+                inputType: "text",
+                placeholder: "مثال: 5 ملاعق",
+                next: () => {
+                    const sugar = document.getElementById("input-16").value.trim();
+                    const errorElement = document.getElementById("error-16");
+                    if (sugar) {
+                        currentUser.condition="sugar";
+                        currentUser.usage = sugar;
+                        submitData();
+                        errorElement.textContent = "";
+                    } else {
+                        errorElement.textContent = "الرجاء إدخال كمية السكر.";
+                    }
+                }
+            },
+            {
+                id: 10,
+                text: "اسم المستخدم غير موجود. هل تريد العودة إلى الصفحة الرئيسية؟",
+                type: "options",
+                options: [
+                    { text: "نعم", action: () => showQuestion(1) },
+                    { text: "لا", action: () => showQuestion(2) }
+                ]
+            },
+            {
+                id: 13,
+                text: "اسم المستخدم موجود بالفعل. هل لديك حساب؟",
+                type: "options",
+                options: [
+                    { text: "نعم", action: () => showQuestion(2) },
+                    { text: "لا", action: () => showQuestion(5) }
+                ]
+            }
+        ];
+    
+        let currentQuestionIndex = 0;
+        let questionHistory = []; // Track the history of questions
+    
+        // Function to display a question
+        function showQuestion(index) {
+            const questionContainer = document.getElementById("question-container");
+            questionContainer.innerHTML = "";
+    
+            const question = questions.find(q => q.id === index);
+            if (!question) return;
+    
+            // Update progress bar
+            const progressBar = document.getElementById("progress");
+            const totalQuestions = questions.length;
+            const currentProgress = ((index - 1) / totalQuestions) * 100;
+            progressBar.style.width = `${currentProgress}%`;
+    
+            // Add current question to history
+            questionHistory.push(index);
+    
+            const questionElement = document.createElement("div");
+            questionElement.classList.add("question", "active");
+    
+            const questionText = document.createElement("p");
+            questionText.innerHTML = question.text;
+            questionElement.appendChild(questionText);
+    
+            if (question.type === "options") {
+                const optionsContainer = document.createElement("div");
+                optionsContainer.classList.add("options-container");
+    
+                question.options.forEach(option => {
+                    const button = document.createElement("button");
+                    button.textContent = option.text;
+                    button.onclick = option.action;
+                    optionsContainer.appendChild(button);
+                });
+    
+                questionElement.appendChild(optionsContainer);
+            } else if (question.type === "input") {
+                const inputContainer = document.createElement("div");
+                inputContainer.classList.add("input-container");
+    
+                const input = document.createElement(question.inputType === "textarea" ? "textarea" : "input");
+                input.type = question.inputType;
+                input.id = `input-${question.id}`;
+                input.placeholder = question.placeholder;
+                inputContainer.appendChild(input);
+    
+                const errorElement = document.createElement("div");
+                errorElement.id = `error-${question.id}`;
+                errorElement.classList.add("error");
+                inputContainer.appendChild(errorElement);
+    
+                const buttonContainer = document.createElement("div");
+                buttonContainer.classList.add("button-container");
+    
+                // "Before" button if history exists
+                if (questionHistory.length > 1) {
+                    const beforeButton = document.createElement("button");
+                    beforeButton.classList.add("before-btn");
+                    beforeButton.innerHTML = '<i class="fas fa-arrow-right"></i> السابق';
+                    beforeButton.onclick = () => {
+                        questionHistory.pop();
+                        const prevQuestion = questionHistory.pop();
+                        showQuestion(prevQuestion);
+                    };
+                    buttonContainer.appendChild(beforeButton);
+                }
+    
+                const nextButton = document.createElement("button");
+                nextButton.classList.add("next-btn");
+                nextButton.innerHTML = 'التالي <i class="fas fa-arrow-left"></i>';
+                nextButton.onclick = question.next;
+                buttonContainer.appendChild(nextButton);
+    
+                questionElement.appendChild(inputContainer);
+                questionElement.appendChild(buttonContainer);
+            } else if (question.type === "info") {
+                const buttonContainer = document.createElement("div");
+                buttonContainer.classList.add("button-container");
+    
+                if (questionHistory.length > 1) {
+                    const beforeButton = document.createElement("button");
+                    beforeButton.classList.add("before-btn");
+                    beforeButton.innerHTML = '<i class="fas fa-arrow-right"></i> السابق';
+                    beforeButton.onclick = () => {
+                        questionHistory.pop();
+                        const prevQuestion = questionHistory.pop();
+                        showQuestion(prevQuestion);
+                    };
+                    buttonContainer.appendChild(beforeButton);
+                }
+    
+                const nextButton = document.createElement("button");
+                nextButton.classList.add("next-btn");
+                nextButton.innerHTML = 'التالي <i class="fas fa-arrow-left"></i>';
+                nextButton.onclick = question.next;
+                buttonContainer.appendChild(nextButton);
+    
+                questionElement.appendChild(buttonContainer);
+            }
+    
+            questionContainer.appendChild(questionElement);
+        }
+    
+        // Function to submit user data and redirect to the plan page
+        function submitData() {
+            // If the user already exists in the users array, do not push a duplicate
+            const existingUser = users.find(user => user.username === currentUser.username);
+            if (!existingUser) {
+                users.push(currentUser);
+                saveUsers();
+            } else {
+                // If the user exists, update currentUser from stored data
+                currentUser = existingUser;
+            }
+            // Store currentUser in localStorage to preserve progress
+            localStorage.setItem("currentUser", JSON.stringify(currentUser));
+    
+            console.log("User data saved:", users);
+            console.log("Current user data saved:", currentUser);
+    
+            // Redirect to plan.html where the user's progress is loaded
+            window.location.href = "plan.html";
+        }
+    
+        // Start the sign-in flow
+        showQuestion(1);
+    </script>
+</body>
+</html>
+
